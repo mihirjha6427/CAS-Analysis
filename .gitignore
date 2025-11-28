@@ -1,0 +1,16 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+
+#ignoring data
+*.csv
+*.geojson
+
+#ignoring renv library
+renv/library/
+renv/staging/
+
+#ignoring shape file
+statsnz-regional-council-2025-SHP/
