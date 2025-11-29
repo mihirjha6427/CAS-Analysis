@@ -41,27 +41,7 @@ facet_wrap(~crashSeverity,ncol =1,scales ="free_y")
 
 
 
-## exploring by region and year
-plot_data<-cas_data %>% 
-  mutate(crashSeverity = ifelse(crashSeverity!= 'Non-Injury Crash','Crash resulting in injury',crashSeverity))%>%
-  filter(
-    region =="Auckland Region", 
-    crashYear < 2025
-    ) %>% 
-  group_by(region, crashYear, crashSeverity) %>% 
-  summarise(count = n_distinct(OBJECTID))
 
-p<-plot_line_chart(
-  data = plot_data,
-  x = crashYear,
-  y= count,
-  grouping = crashSeverity,
-  title = "Annual Trend in Reported Crashes by Severity and Regions",
-  xlab ="Year"
-  
-)
-  
-p#+ facet_wrap(~region, scales = "free_y") + theme_bw()
 
 ### exploring the crash by holidays
 cas_data %>% group_by(holiday) %>% summarise(count = n_distinct(OBJECTID))
@@ -74,6 +54,30 @@ cas_data %>%
   theme_minimal() +
   labs(title = "Distribution of Crash Speed Limits", x = "Speed Limit", y = "Count")
 
+## roadways/crash location and injuries count
+crash_location <- cas_data %>% group_by(crashLocation1) %>% 
+  summarise(count =n_distinct(OBJECTID)) %>% 
+  ungroup()
+
+top_n_points <- crash_location %>% 
+  mutate(perc_total = round(count * 100 / sum(count),0)) %>%
+  top_n(10, count)
+
+
+crash_location %>% 
+  ggplot(
+    aes(x = crashLocation1, y = count)) + 
+  geom_point(color = "darkblue", size = 3) + 
+  geom_text(
+    data = top_n_points,
+    aes(label = paste0(crashLocation1,"(",perc_total,"%)")),
+    nudge_x = 1000,
+    nudge_y = 1000
+  ) +
+  labs(title = "Scatter Plot by Crash Location (Location1)", x = "Crash Location", y = "Count") +
+  theme_minimal() +
+  scale_y_continuous(labels = comma)+
+  theme(axis.text.x = element_blank())
 
 
 
@@ -105,17 +109,9 @@ cas_data %>% group_by(meshblockId) %>% summarise(count = n_distinct(OBJECTID)) %
   labs(title = "Scatter Plot Example", x = "X Axis Label", y = "Y Axis Label") +
   theme_minimal()
 
-## roadways and injuries count
-crash_location <- cas_data %>% group_by(crashLocation1) %>% summarise(count =
-                                                                        n_distinct(OBJECTID)) %>% ungroup()
-top_n_points <- crash_location %>% mutate(perc_total = count * 100 / sum(count)) %>%
-  top_n(10, count)
-crash_location %>% ggplot(aes(x = crashLocation1, y = count)) + geom_point(color = "darkblue", size = 3) + geom_text(
-  data = top_n_points,
-  aes(label = crashLocation1),
-  nudge_x = 1000,
-  nudge_y = 1000
-) +
-  labs(title = "Scatter plot by Crash Location1", x = "Crash Location", y = "Count") +
-  theme_minimal() +
-  theme(axis.text.x = element_blank())
+
+
+
+
+######## Remove files
+rm(crash_by_location,crash_by_meshblock,crash_by_year,crash_location,top_n_points)

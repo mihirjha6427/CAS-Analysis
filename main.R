@@ -44,7 +44,6 @@ nrow(cas_data) == sum(crash_by_year$count)
 ## Are there any missing values in the cas data specially for regional analysis
 cas_data%>%select(X,Y,region,tlaName)%>%summarise(across(everything(), ~sum(is.na(.) | str_trim(.) =="")))
 region_lookup<-cas_data%>%filter(region!="", tlaName!="")%>%distinct(region,tlaName)
-cas_data<- cas_data%>%mutate(tlaName)
 
 
 
