@@ -32,71 +32,81 @@ coordinates_plot(
 
 
 ## let's break it down by crash severity
-data_by_severity<- data %>%mutate(crashSeverity = ifelse(crashSeverity!="Non-Injury Crash","Injury Crash",crashSeverity)) %>%
+data_by_severity<- data %>%
+  mutate(crashSeverity = ifelse(crashSeverity!="Non-Injury Crash","Injury Crash",crashSeverity)) %>%
   group_by(X_round,Y_round,crashSeverity)%>%summarise(count = n_distinct(OBJECTID))%>%
   ungroup()
 
-p1<- coordinates_plot(data=data_by_severity%>%filter(crashSeverity=="Non-Injury Crash"),title = "Non-Injury crash count - 10 km grid",top_n = 9)
-p2<- coordinates_plot(data=data_by_severity%>%filter(crashSeverity!="Non-Injury Crash"),title = "Crash resulting in injury - 10 km grid",top_n = 9)
+p1<- coordinates_plot(
+  data=data_by_severity%>%filter(crashSeverity=="Non-Injury Crash"),
+  title = "Non-Injury crash count - 10 km grid",
+  top_n = 9
+  )
+
+
+p2<- coordinates_plot(
+  data=data_by_severity%>%filter(crashSeverity!="Non-Injury Crash"),
+  title = "Crash resulting in injury - 10 km grid",
+  top_n = 9
+  )
 
 p1 + p2
 
 
 
 ## getting coordinates
-top_9_hotspots <- data_summarized %>% mutate(perc_total = count * 100 /
-                                               sum(count))%>%top_n(9,count)%>%arrange(desc(count))
+top_9_hotspots <- data_summarized %>% 
+  mutate(perc_total = count * 100 /sum(count))%>%
+  top_n(9,count)%>%arrange(desc(count))
 
 top_9_hotspots$hotspots<-1:9
 
 ## inner joining with data
-hotspots_data<- data%>%inner_join(top_9_hotspots,by=c("X_round"="X_round","Y_round"="Y_round"))
+hotspots_data<- data%>%
+  inner_join(
+    top_9_hotspots,
+    by=c(
+      "X_round"="X_round",
+      "Y_round"="Y_round"
+      )
+    )
 
 ## cleaning and replacing the data
-hotspots_data<- hotspots_data%>%mutate(tlaName = ifelse(tlaName=="","Auckland",tlaName))
+hotspots_data<-hotspots_data%>%
+  mutate(
+    crashSeverity= ifelse(crashSeverity!="Non-Injury Crash","Injury-related","Non-Injury"),
+    X=round(X,-1),
+    Y=round(Y,-1)
+    )%>%
+  group_by(X,Y,crashSeverity)%>%
+  summarise(count = n_distinct(OBJECTID))%>%ungroup()
 
-## checking
-hotspots_data%>%group_by(hotspots,tlaName)%>%summarise(count = n_distinct(OBJECTID))
+hotspots_data_sf = hotspots_data%>%st_as_sf(coords = c("X","Y"),crs=2193)%>%
+  st_transform(4326)
 
-## replacing waikato district with Hamilton city
-hotspots_data<- hotspots_data%>%mutate(tlaName = ifelse(tlaName=="Waikato District","Hamilton City",tlaName))
+pal<-colorFactor(
+  palette = c("darkgreen","darkred"),
+  domain = c("Non-Injury","Injury-related")
+)
 
-hotspots_data<-hotspots_data%>%unite("hotspot_city",hotspots,tlaName)
+leaflet()%>%
+  addTiles()%>% 
+  addCircleMarkers(
+  data=hotspots_data_sf,
+  radius = ~ rescale(count, to = c(3,20)),
+  label = ~count,
+  color = ~pal(crashSeverity),
+  fillOpacity = 0.6,
+  stroke = FALSE
+  )
 
-## plotting time series for checking
-hotspots_data %>% filter(crashYear<=2024,crashSeverity!='Non-Injury Crash')%>% group_by(hotspot_city,crashYear) %>% summarise(count = n_distinct(OBJECTID)) %>%
-  mutate(smoothed_count = round((lag(count,1)+count + lead(count,1))/3,0),
-         smoothed_count = if_else(is.na(smoothed_count),count,smoothed_count))%>%
-  ggplot(aes(x = crashYear, y = smoothed_count )) +
-  geom_line(aes(color = hotspot_city),size = 1.2) + geom_point(color='darkred',size = 2) + geom_text(
-    aes(label = smoothed_count),
-    size = 2,
-    vjust = -1,
-    nudge_y = 5
-  ) + theme_minimal()+ labs(title = "Hotspot time-series analysis (Smoothened)",
-                            x = "year") + ylab("Smoothened Count")
-
-
-
-
-
-
-### Plotting recent years hotspot
-
-data_by_severity<- data%>%filter(crashYear >2022) %>%mutate(crashSeverity = ifelse(crashSeverity!="Non-Injury Crash","Injury Crash",crashSeverity)) %>%
-  group_by(X_round,Y_round,crashSeverity)%>%summarise(count = n_distinct(OBJECTID))%>%
-  ungroup()
-
-p1<- coordinates_plot(data=data_by_severity%>%filter(crashSeverity=="Non-Injury Crash"),title = "Crash with no injury,Year 2023-2025,10 km grid",top_n = 9)
-p2<- coordinates_plot(data=data_by_severity%>%filter(crashSeverity!="Non-Injury Crash"),title = "Crash resulting in injury,Year 2023-2025,10 km grid",top_n = 9)
-
-p1 + p2
 
 
 
 
 ## converting it into simple features (sf) for further analysis
-
+##  creating a leaflet map of all the injury related crashed where the aggegated crash
+## counts within 10m was greater than 5
 data_sf = cas_data%>%mutate(X=round(X,-1),Y=round(Y,-1))%>%st_as_sf(coords = c("X","Y"),crs = 2193,remove = FALSE)%>%
   st_transform(4326)
 
@@ -107,6 +117,11 @@ map_data <- data_sf %>% filter(crashSeverity != "Non-Injury Crash") %>% group_by
 leaflet() %>% addTiles() %>% addCircleMarkers(data = map_data,
                                               radius = ~ rescale(count, to = c(3, 15)),
                                               label = ~ count)
+
+
+
+
+
 
 
 ## Looking at where fatal crahses occured
