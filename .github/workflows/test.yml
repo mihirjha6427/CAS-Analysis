@@ -1,0 +1,38 @@
+name: test functions and R CMD checks
+
+on:
+  push:
+
+
+jobs:
+  test-plot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: get repository
+        uses: actions/checkout@v4
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+
+      - name: restore renv
+        run: |
+            Rscript -e 'install.packages("renv", repos = "https://cloud.r-project.org")'
+            Rscript -e 'renv::restore()'
+
+      - name: Run plot tests
+        run: |
+          Rscript -e 'testthat::test_file("tests/test-plot.R")'
+
+      - name: Run R CMD check
+        run: |
+          Rscript -e 'install.packages("rcmdcheck")'
+          Rscript -e 'rcmdcheck::rcmdcheck(build = TRUE, error_on ="error")'
+    
+  
+
+
+
+  
+  
+  
